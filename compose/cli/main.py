@@ -140,6 +140,7 @@ class TopLevelCommand(DocoptCommand):
       start              Start services
       stop               Stop services
       unpause            Unpause services
+      clean              Remove orphan containers
       up                 Create and start containers
       migrate-to-labels  Recreate containers to add labels
       version            Show the Docker-Compose version information
@@ -256,16 +257,43 @@ class TopLevelCommand(DocoptCommand):
         Usage: ps [options] [SERVICE...]
 
         Options:
-            -q    Only display IDs
+            -q          Only display IDs
+            -a, --all   Display orphan containers
         """
+        orphan = options.get('--all', False)
         containers = sorted(
             project.containers(service_names=options['SERVICE'], stopped=True) +
             project.containers(service_names=options['SERVICE'], one_off=True),
             key=attrgetter('name'))
 
+        orphan_containers = sorted(
+            project.containers(stopped=True, orphan=True) +
+            project.containers(one_off=True, orphan=True),
+            key=attrgetter('name'))
+
+        def table(containers, misc=None):
+            rows = []
+            for container in containers:
+                command = container.human_readable_command
+                if len(command) > 30:
+                    command = '%s ...' % command[:26]
+                row = [
+                    container.name,
+                    command,
+                    container.human_readable_state,
+                    container.human_readable_ports,
+                ]
+                if misc:
+                    row.append(misc)
+                rows.append(row)
+            return rows
+
         if options['-q']:
             for container in containers:
                 print(container.id)
+            if orphan:
+                for container in orphan_containers:
+                    print(container.id)
         else:
             headers = [
                 'Name',
@@ -273,17 +301,13 @@ class TopLevelCommand(DocoptCommand):
                 'State',
                 'Ports',
             ]
-            rows = []
-            for container in containers:
-                command = container.human_readable_command
-                if len(command) > 30:
-                    command = '%s ...' % command[:26]
-                rows.append([
-                    container.name,
-                    command,
-                    container.human_readable_state,
-                    container.human_readable_ports,
-                ])
+            rows = table(containers)
+            if orphan:
+                headers.append('Misc')
+                rows += table(orphan_containers, misc='orphan')
+                # extend all rows to header length
+                rows = [r + [''] * (len(headers) - len(r))
+                        if len(r) is not len(headers) else r for r in rows]
             print(Formatter().table(headers, rows))
 
     def pull(self, project, options):
@@ -522,6 +546,38 @@ class TopLevelCommand(DocoptCommand):
         """
         project.unpause(service_names=options['SERVICE'])
 
+    def clean(self, project, options):
+        """
+        Kill and remove orphan containers.
+
+        If any container from a previous version of docker-compose.yml is running,
+        this container will be killed and removed.
+
+        If the container is not running, it will be removed.
+
+        Orphan containers are identified using labels.
+
+        To prevent Compose from removing containers, use the `--keep` flag.
+
+        Usage: clean [options]
+
+        Options:
+            --keep          Do not remove containers.
+            -f, --force     Don't ask to confirm removal.
+        """
+
+        orphan_containers = (project.containers(orphan=True, stopped=True) +
+                             project.containers(orphan=True, one_off=True))
+        keep = options.get('--keep', False)
+        if len(orphan_containers) is 0:
+            print("No orphan containers")
+        elif keep or options.get('--force'):
+            project.clean(keep=keep)
+        else:
+            print("Going to remove", list_containers(orphan_containers))
+            if yesno("Are you sure? [yN] ", default=False):
+                project.clean(keep=keep)
+
     def up(self, project, options):
         """
         Builds, (re)creates, starts, and attaches to containers for a service.
@@ -541,6 +597,8 @@ class TopLevelCommand(DocoptCommand):
         If you want to force Compose to stop and recreate all containers, use the
         `--force-recreate` flag.
 
+        Orphan containers can be killed using the `--clean` flag.
+
         Usage: up [options] [SERVICE...]
 
         Options:
@@ -557,6 +615,7 @@ class TopLevelCommand(DocoptCommand):
             -t, --timeout TIMEOUT  Use this timeout in seconds for container shutdown
                                    when attached or when containers are already
                                    running. (default: 10)
+            --clean                Kill orphan containers.
         """
         if options['--allow-insecure-ssl']:
             log.warn(INSECURE_SSL_WARNING)
@@ -571,7 +630,8 @@ class TopLevelCommand(DocoptCommand):
             start_deps=start_deps,
             strategy=convergence_strategy_from_opts(options),
             do_build=not options['--no-build'],
-            timeout=timeout
+            timeout=timeout,
+            clean=options['--clean']
         )
 
         if not options['-d']:

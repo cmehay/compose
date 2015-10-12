@@ -284,12 +284,31 @@ class Project(object):
             else:
                 log.info('%s uses an image, skipping' % service.name)
 
+    def clean(self, keep=False):
+        all_containers = (self.containers(orphan=True, stopped=True) +
+                          self.containers(orphan=True, one_off=True))
+        running_containers = [c for c in all_containers if c.is_running]
+        parallel_execute(
+            objects=running_containers,
+            obj_callable=lambda c: c.kill(),
+            msg_index=lambda c: c.name,
+            msg="Killing"
+        )
+        if not keep:
+            parallel_execute(
+                objects=all_containers,
+                obj_callable=lambda c: c.remove(),
+                msg_index=lambda c: c.name,
+                msg="Removing"
+            )
+
     def up(self,
            service_names=None,
            start_deps=True,
            strategy=ConvergenceStrategy.changed,
            do_build=True,
-           timeout=DEFAULT_TIMEOUT):
+           timeout=DEFAULT_TIMEOUT,
+           clean=False):
 
         services = self.get_services(service_names, include_deps=start_deps)
 
@@ -300,6 +319,9 @@ class Project(object):
 
         if self.use_networking:
             self.ensure_network_exists()
+
+        if clean:
+            self.clean(keep=True)
 
         return [
             container
@@ -338,7 +360,12 @@ class Project(object):
         for service in self.get_services(service_names, include_deps=False):
             service.pull(ignore_pull_failures)
 
-    def containers(self, service_names=None, stopped=False, one_off=False):
+    def containers(self,
+                   service_names=None,
+                   stopped=False,
+                   one_off=False,
+                   orphan=False):
+
         if service_names:
             self.validate_service_names(service_names)
         else:
@@ -350,7 +377,9 @@ class Project(object):
                 all=stopped,
                 filters={'label': self.labels(one_off=one_off)})]))
 
-        def matches_service_names(container):
+        def matches_service_names(container, orphan):
+            if orphan:
+                return container.labels.get(LABEL_SERVICE) not in service_names
             return container.labels.get(LABEL_SERVICE) in service_names
 
         if not containers:
@@ -360,7 +389,7 @@ class Project(object):
                 self.service_names,
             )
 
-        return [c for c in containers if matches_service_names(c)]
+        return [c for c in containers if matches_service_names(c, orphan)]
 
     def get_network(self):
         networks = self.client.networks(names=[self.name])
