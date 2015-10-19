@@ -366,9 +366,10 @@ class Project(object):
                    one_off=False,
                    orphan=False):
 
-        if service_names:
+        if service_names and not orphan:
             self.validate_service_names(service_names)
         else:
+            orphan_name = service_names
             service_names = self.service_names
 
         containers = list(filter(None, [
@@ -377,10 +378,12 @@ class Project(object):
                 all=stopped,
                 filters={'label': self.labels(one_off=one_off)})]))
 
-        def matches_service_names(container, orphan):
+        def matches_service_names(container):
+            label= container.labels.get(LABEL_SERVICE)
             if orphan:
-                return container.labels.get(LABEL_SERVICE) not in service_names
-            return container.labels.get(LABEL_SERVICE) in service_names
+                return (label not in service_names and
+                        (not orphan_name or label in orphan_name))
+            return label in service_names
 
         if not containers:
             check_for_legacy_containers(
@@ -389,7 +392,7 @@ class Project(object):
                 self.service_names,
             )
 
-        return [c for c in containers if matches_service_names(c, orphan)]
+        return [c for c in containers if matches_service_names(c)]
 
     def get_network(self):
         networks = self.client.networks(names=[self.name])

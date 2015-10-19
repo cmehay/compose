@@ -257,43 +257,40 @@ class TopLevelCommand(DocoptCommand):
         Usage: ps [options] [SERVICE...]
 
         Options:
-            -q          Only display IDs
+            -q    Only display IDs
             -a, --all   Display orphan containers
         """
         orphan = options.get('--all', False)
-        containers = sorted(
-            project.containers(service_names=options['SERVICE'], stopped=True) +
-            project.containers(service_names=options['SERVICE'], one_off=True),
-            key=attrgetter('name'))
+        try:
+            # We should bypass NoSuchService exception to handle
+            # orphan filtering
+            containers = sorted(
+                project.containers(service_names=options['SERVICE'],
+                                   stopped=True) +
+                project.containers(service_names=options['SERVICE'],
+                                   one_off=True),
+                key=attrgetter('name'))
+        except NoSuchService:
+            containers = []
+        nb_containers = len(containers)
 
-        orphan_containers = sorted(
-            project.containers(stopped=True, orphan=True) +
-            project.containers(one_off=True, orphan=True),
-            key=attrgetter('name'))
+        if orphan:
+            containers = containers + sorted(
+                project.containers(service_names=options['SERVICE'],
+                                   stopped=True,
+                                   orphan=True) +
+                project.containers(service_names=options['SERVICE'],
+                                   one_off=True,
+                                   orphan=True),
+                key=attrgetter('name'))
 
-        def table(containers, misc=None):
-            rows = []
-            for container in containers:
-                command = container.human_readable_command
-                if len(command) > 30:
-                    command = '%s ...' % command[:26]
-                row = [
-                    container.name,
-                    command,
-                    container.human_readable_state,
-                    container.human_readable_ports,
-                ]
-                if misc:
-                    row.append(misc)
-                rows.append(row)
-            return rows
+        if len(containers) is 0:
+            # Now we are using validate_service_names to raise NoSuchService
+            project.validate_service_names(options['SERVICE'])
 
         if options['-q']:
             for container in containers:
                 print(container.id)
-            if orphan:
-                for container in orphan_containers:
-                    print(container.id)
         else:
             headers = [
                 'Name',
@@ -301,13 +298,20 @@ class TopLevelCommand(DocoptCommand):
                 'State',
                 'Ports',
             ]
-            rows = table(containers)
-            if orphan:
-                headers.append('Misc')
-                rows += table(orphan_containers, misc='orphan')
-                # extend all rows to header length
-                rows = [r + [''] * (len(headers) - len(r))
-                        if len(r) is not len(headers) else r for r in rows]
+            rows = []
+            for nb, container in enumerate(containers):
+                command = container.human_readable_command
+                state = container.human_readable_state
+                if len(command) > 30:
+                    command = '%s ...' % command[:26]
+                if nb >= nb_containers:
+                    state = '%s (orphan)' % state
+                rows.append([
+                    container.name,
+                    command,
+                    state,
+                    container.human_readable_ports,
+                ])
             print(Formatter().table(headers, rows))
 
     def pull(self, project, options):
