@@ -93,9 +93,9 @@ class CLITestCase(DockerClientTestCase):
         self.command.dispatch(['up', '-d'], None)
         shutil.copyfile('tests/fixtures/orphan-services/docker-compose.after.yml',
                         'tests/fixtures/orphan-services/docker-compose.yml')
+
         with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             self.command.dispatch(['ps', '--all'], None)
-
         output = mock_stdout.getvalue()
         self.assertIn('orphanservices_test1_1', output)
         self.assertIn('orphanservices_test2_1', output)
@@ -104,10 +104,31 @@ class CLITestCase(DockerClientTestCase):
 
         with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             self.command.dispatch(['ps', '--all', '-q'], None)
-
         output = mock_stdout.getvalue()
         lines = output.splitlines()
         self.assertEqual(len(lines), 3)
+
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['ps', '--all', 'test1'], None)
+        output = mock_stdout.getvalue()
+        self.assertIn('orphanservices_test1_1', output)
+
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['ps', '--all', 'test2'], None)
+        output = mock_stdout.getvalue()
+        self.assertIn('orphanservices_test2_1', output)
+        self.assertIn('Up (orphan)', output)
+
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['ps', '--all', 'test3'], None)
+        output = mock_stdout.getvalue()
+        self.assertIn('orphanservices_test3_1', output)
+        self.assertIn('Exit 0 (orphan)', output)
+
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['ps', '--all', 'test4'], None)
+        output = mock_stdout.getvalue()
+        self.assertIn('No such service: test4', output)
 
     @mock.patch('compose.service.log')
     def test_pull(self, mock_logging):
