@@ -125,10 +125,10 @@ class CLITestCase(DockerClientTestCase):
         self.assertIn('orphanservices_test3_1', output)
         self.assertIn('Exit 0 (orphan)', output)
 
+        with self.assertRaises(SystemExit) as exc_context:
         with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             self.command.dispatch(['ps', '--all', 'test4'], None)
-        output = mock_stdout.getvalue()
-        self.assertIn('No such service: test4', output)
+            self.assertIn('No such service: test4', str(exc_context.exception))
 
     @mock.patch('compose.service.log')
     def test_pull(self, mock_logging):
