@@ -125,7 +125,7 @@ class CLITestCase(DockerClientTestCase):
         self.assertIn('orphanservices_test3_1', output)
         self.assertIn('Exit 0 (orphan)', output)
 
-        with self.assertRaises(SystemExit) as exc_context:
+        with self.assertRaises(NoSuchService) as exc_context:
             self.command.dispatch(['ps', '--all', 'test4'], None)
             self.assertIn('No such service: test4', str(exc_context.exception))
 
