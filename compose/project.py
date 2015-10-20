@@ -379,7 +379,7 @@ class Project(object):
                 filters={'label': self.labels(one_off=one_off)})]))
 
         def matches_service_names(container):
-            label= container.labels.get(LABEL_SERVICE)
+            label = container.labels.get(LABEL_SERVICE)
             if orphan:
                 return (label not in service_names and
                         (not orphan_name or label in orphan_name))
