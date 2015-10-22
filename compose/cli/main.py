@@ -262,8 +262,7 @@ class TopLevelCommand(DocoptCommand):
         """
         orphan = options.get('--all', False)
         containers = []
-        services = [[]] if len(options['SERVICE']) is 0 \
-            else options['SERVICE']
+        services = [None] if options['SERVICE'] is None else options['SERVICE']
 
         try:
             # We should bypass NoSuchService exception to handle
@@ -271,10 +270,11 @@ class TopLevelCommand(DocoptCommand):
 
             # Hack: we should test one service at time to avoid exceptions
             for service in services:
+                service = None if service is None else [service]
                 containers = sorted(containers +
-                                    project.containers(service_names=[service],
+                                    project.containers(service_names=service,
                                                        stopped=True) +
-                                    project.containers(service_names=[service],
+                                    project.containers(service_names=service,
                                                        one_off=True),
                                     key=attrgetter('name'))
         except NoSuchService:
