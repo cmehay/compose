@@ -261,17 +261,24 @@ class TopLevelCommand(DocoptCommand):
             -a, --all   Display orphan containers
         """
         orphan = options.get('--all', False)
+        containers = []
+        services = [[]] if len(options['SERVICE']) is 0 \
+            else options['SERVICE']
+
         try:
             # We should bypass NoSuchService exception to handle
             # orphan filtering
-            containers = sorted(
-                project.containers(service_names=options['SERVICE'],
-                                   stopped=True) +
-                project.containers(service_names=options['SERVICE'],
-                                   one_off=True),
-                key=attrgetter('name'))
+
+            # Hack: we should test one service at time to avoid exceptions
+            for service in services:
+                containers = sorted(containers +
+                                    project.containers(service_names=[service],
+                                                       stopped=True) +
+                                    project.containers(service_names=[service],
+                                                       one_off=True),
+                                    key=attrgetter('name'))
         except NoSuchService:
-            containers = []
+            pass
         nb_containers = len(containers)
 
         if orphan:
