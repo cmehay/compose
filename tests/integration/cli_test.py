@@ -822,6 +822,7 @@ class CLITestCase(DockerClientTestCase):
                         'tests/fixtures/orphan-services/docker-compose.yml')
         self.command.base_dir = 'tests/fixtures/orphan-services'
         self.command.dispatch(['up', '-d'], None)
+        self.command.dispatch(['up', '-d'], None)
         shutil.copyfile('tests/fixtures/orphan-services/docker-compose.after.yml',
                         'tests/fixtures/orphan-services/docker-compose.yml')
         self.command.dispatch(['up', '-d', '--clean'], None)

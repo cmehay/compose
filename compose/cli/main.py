@@ -264,22 +264,23 @@ class TopLevelCommand(DocoptCommand):
         containers = []
         services = [None] if options['SERVICE'] is None else options['SERVICE']
 
-        try:
-            # We should bypass NoSuchService exception to handle
-            # orphan filtering
+        for service in services:
+            service = None if service is None else [service]
+            try:
+                # We should bypass NoSuchService exception to handle
+                # orphan filtering
 
-            # Hack: we should test one service at time to avoid exceptions
-            for service in services:
-                service = None if service is None else [service]
+                # Hack: we should test one service at time to avoid exceptions
+                print(service)
                 containers = sorted(containers +
                                     project.containers(service_names=service,
                                                        stopped=True) +
                                     project.containers(service_names=service,
                                                        one_off=True),
                                     key=attrgetter('name'))
-        except NoSuchService:
-            if not orphan:
-                project.validate_service_names(options['SERVICE'])
+            except NoSuchService:
+                if not orphan:
+                    project.validate_service_names(options['SERVICE'])
         nb_containers = len(containers)
 
         if orphan:
