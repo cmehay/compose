@@ -264,7 +264,7 @@ class TopLevelCommand(DocoptCommand):
         containers = []
         services = options['SERVICE']
 
-        for service in services if len(services) else [[]]
+        for service in services if len(services) else [[]]:
             # Hack: we should test one service at time to avoid exceptions
             service = [] if len(service) is 0 else [service]
             try:
