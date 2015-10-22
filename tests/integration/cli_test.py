@@ -91,6 +91,7 @@ class CLITestCase(DockerClientTestCase):
                         'tests/fixtures/orphan-services/docker-compose.yml')
         self.command.base_dir = 'tests/fixtures/orphan-services'
         self.command.dispatch(['up', '-d'], None)
+        self.command.dispatch(['scale', 'test2=2'], None)
         shutil.copyfile('tests/fixtures/orphan-services/docker-compose.after.yml',
                         'tests/fixtures/orphan-services/docker-compose.yml')
 
@@ -99,6 +100,7 @@ class CLITestCase(DockerClientTestCase):
         output = mock_stdout.getvalue()
         self.assertIn('orphanservices_test1_1', output)
         self.assertIn('orphanservices_test2_1', output)
+        self.assertIn('orphanservices_test2_2', output)
         self.assertIn('orphanservices_test3_1', output)
         self.assertIn('orphan', output)
 
@@ -106,28 +108,53 @@ class CLITestCase(DockerClientTestCase):
             self.command.dispatch(['ps', '--all', '-q'], None)
         output = mock_stdout.getvalue()
         lines = output.splitlines()
-        self.assertEqual(len(lines), 3)
+        self.assertEqual(len(lines), 4)
 
         with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             self.command.dispatch(['ps', '--all', 'test1'], None)
         output = mock_stdout.getvalue()
         self.assertIn('orphanservices_test1_1', output)
+        self.assertNotIn('orphanservices_test2_1', output)
+        self.assertNotIn('orphanservices_test3_1', output)
 
         with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             self.command.dispatch(['ps', '--all', 'test2'], None)
         output = mock_stdout.getvalue()
+        self.assertNotIn('orphanservices_test1_1', output)
         self.assertIn('orphanservices_test2_1', output)
+        self.assertIn('orphanservices_test2_2', output)
+        self.assertNotIn('orphanservices_test3_1', output)
         self.assertIn('Up (orphan)', output)
 
         with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
             self.command.dispatch(['ps', '--all', 'test3'], None)
         output = mock_stdout.getvalue()
+        self.assertNotIn('orphanservices_test1_1', output)
+        self.assertNotIn('orphanservices_test2_1', output)
         self.assertIn('orphanservices_test3_1', output)
         self.assertIn('Exit 0 (orphan)', output)
+
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['ps', '--all', 'test1', 'test2'], None)
+        output = mock_stdout.getvalue()
+        self.assertIn('orphanservices_test1_1', output)
+        self.assertIn('orphanservices_test2_1', output)
+        self.assertIn('orphanservices_test2_2', output)
+        self.assertNotIn('orphanservices_test3_1', output)
+        self.assertIn('Up (orphan)', output)
 
         with self.assertRaises(NoSuchService) as exc_context:
             self.command.dispatch(['ps', '--all', 'test4'], None)
             self.assertIn('No such service: test4', str(exc_context.exception))
+
+        with mock.patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+            self.command.dispatch(['ps', '--all', 'test4', 'test2'], None)
+        output = mock_stdout.getvalue()
+        self.assertNotIn('orphanservices_test1_1', output)
+        self.assertIn('orphanservices_test2_1', output)
+        self.assertIn('orphanservices_test2_2', output)
+        self.assertNotIn('orphanservices_test3_1', output)
+        self.assertIn('Up (orphan)', output)
 
     @mock.patch('compose.service.log')
     def test_pull(self, mock_logging):
