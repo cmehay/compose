@@ -262,11 +262,10 @@ class TopLevelCommand(DocoptCommand):
         """
         orphan = options.get('--all', False)
         containers = []
-        services = options['SERVICE']
+        services = [[s] for s in options['SERVICE']] \
+            if len(options['SERVICE']) else [[]]
 
-        for service in services if len(services) else [[]]:
-            # Hack: we should test one service at time to avoid exceptions
-            service = [] if len(service) is 0 else [service]
+        for service in services:
             try:
                 # We should bypass NoSuchService exception to handle
                 # orphan filtering
