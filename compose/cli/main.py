@@ -257,7 +257,7 @@ class TopLevelCommand(DocoptCommand):
         Usage: ps [options] [SERVICE...]
 
         Options:
-            -q    Only display IDs
+            -q          Only display IDs
             -a, --all   Display orphan containers
         """
         orphan = options.get('--all', False)
@@ -278,7 +278,8 @@ class TopLevelCommand(DocoptCommand):
                                                        one_off=True),
                                     key=attrgetter('name'))
         except NoSuchService:
-            pass
+            if not orphan:
+                project.validate_service_names(options['SERVICE'])
         nb_containers = len(containers)
 
         if orphan:

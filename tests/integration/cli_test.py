@@ -156,6 +156,9 @@ class CLITestCase(DockerClientTestCase):
         self.assertNotIn('orphanservices_test3_1', output)
         self.assertIn('Up (orphan)', output)
 
+        # Clean to not interferate with other tests
+        self.command.dispatch(['clean'], None)
+
     @mock.patch('compose.service.log')
     def test_pull(self, mock_logging):
         self.command.dispatch(['pull'], None)
@@ -825,6 +828,9 @@ class CLITestCase(DockerClientTestCase):
         self.assertEqual(len(self.project.containers(stopped=True, orphan=True)), 2)
         self.assertEqual(len(self.project.containers(stopped=False, orphan=True)), 0)
         self.assertEqual(len(self.project.containers(stopped=False)), 1)
+
+        # Clean to not interferate with other tests
+        self.command.dispatch(['clean'], None)
 
     def test_clean(self):
         shutil.copyfile('tests/fixtures/orphan-services/docker-compose.before.yml',
